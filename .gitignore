@@ -1,0 +1,25 @@
+# Rust / Anchor build artifacts
+target/
+**/*.rs.bk
+.anchor/
+.bolt/
+
+# Node / frontend (not part of this repo)
+node_modules/
+app/
+client/
+scripts/
+tests/
+crates/
+migrations/
+package.json
+package-lock.json
+tsconfig.json
+.prettierignore
+
+# Solana local validator
+test-ledger/
+
+# OS
+.DS_Store
+.yarn

@@ -1,0 +1,25 @@
+[package]
+name = "session-keys"
+version = "2.0.8"
+edition = "2021"
+authors = ["Gum Core Dev <dev@magicblock.gg>"]
+license = "GPL-3.0-or-later"
+description = "Gum Session Protocol (GPL Session)"
+repository = "https://github.com/magicblock-labs/gum-program-library"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "session_keys"
+
+[features]
+no-entrypoint = ["session-keys-macros"]
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = ">=0.30.0"
+solana-security-txt = "=1.1.1"
+session-keys-macros = { version = "^0.1.2", path = "macros", optional = true }

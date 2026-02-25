@@ -1,0 +1,31 @@
+[package]
+name = "reveal-action"
+version = "0.2.4"
+description = "Created with Bolt"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "reveal_action"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["bolt-lang/idl-build"]
+anchor-debug = ["bolt-lang/anchor-debug"]
+custom-heap = []
+custom-panic = []
+
+
+[dependencies]
+bolt-lang.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+
+match-config = { path = "../../components/match-config", features = ["cpi"] }
+match-state = { path = "../../components/match-state", features = ["cpi"] }
+players = { path = "../../components/players", features = ["cpi"] }
+turn-data = { path = "../../components/turn-data", features = ["cpi"] }
+solana-sha256-hasher = "2.3"

@@ -1,0 +1,24 @@
+[workspace]
+members = [
+    "programs-ecs/components/*",
+    "programs-ecs/systems/*",
+    "programs/lobby",
+]
+resolver = "2"
+
+[workspace.dependencies]
+bolt-lang = "0.2.4"
+
+[profile.release]
+overflow-checks = true
+lto = "fat"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 3
+incremental = false
+codegen-units = 1
+
+[patch.crates-io]
+# Fix session-keys compatibility with solana-program v2.3 (native_token module removed)
+session-keys = { path = "patches/session-keys" }

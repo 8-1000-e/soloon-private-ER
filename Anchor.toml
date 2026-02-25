@@ -1,0 +1,63 @@
+[toolchain]
+channel = "stable"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+commit_action = "EtF5LQ9tAfbBD7ez4GxP3S4AbTRFZupdw6PFLB4qtfL4"
+create_match = "EaXW3WKMewu7hzeDCJX4phpQj75uWtNse8aaqyAsguPy"
+end_match = "63aHmRtezLwdybGnSLDYU679CTFUB9JMhQfbst1zA5sb"
+lobby = "4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB"
+match_config = "35GEdGYpCaZfafmtQoea5pgz4Y2G2ciYQXjwDm7dCGYv"
+match_state = "AKnxJJqzHKy99bD2gqM5YdjSHMEbwDYrk69mzd2pb52Y"
+players = "2mwqV9NyisXsRgKFQC62Ne1JhNLSYKxD2GuD75W7Rgcz"
+resolve_turn = "DjN7EguTF3dhZ3S1ueFZDFNB4VeEXruPRdVJQ9LbMqZ"
+reveal_action = "3QSqmCakjVv3qGY4oD7hNzTHHE2LQQByU6Yj5iybkmxh"
+turn_data = "DCwYD9hZjpL3RhnhYo3fLWby6YxahjeQ5Gd9ggsp9Mhi"
+
+[programs.devnet]
+commit_action = "EtF5LQ9tAfbBD7ez4GxP3S4AbTRFZupdw6PFLB4qtfL4"
+create_match = "EaXW3WKMewu7hzeDCJX4phpQj75uWtNse8aaqyAsguPy"
+end_match = "63aHmRtezLwdybGnSLDYU679CTFUB9JMhQfbst1zA5sb"
+lobby = "4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB"
+match_config = "35GEdGYpCaZfafmtQoea5pgz4Y2G2ciYQXjwDm7dCGYv"
+match_state = "AKnxJJqzHKy99bD2gqM5YdjSHMEbwDYrk69mzd2pb52Y"
+players = "2mwqV9NyisXsRgKFQC62Ne1JhNLSYKxD2GuD75W7Rgcz"
+resolve_turn = "DjN7EguTF3dhZ3S1ueFZDFNB4VeEXruPRdVJQ9LbMqZ"
+reveal_action = "3QSqmCakjVv3qGY4oD7hNzTHHE2LQQByU6Yj5iybkmxh"
+turn_data = "DCwYD9hZjpL3RhnhYo3fLWby6YxahjeQ5Gd9ggsp9Mhi"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[workspace]
+members = ["programs-ecs/components/*", "programs-ecs/systems/*", "programs/lobby"]
+
+[scripts]
+test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 30000
+shutdown_wait = 2000
+upgradeable = false
+
+[[test.genesis]]
+address = "WorLD15A7CrDwLcLy4fRqtaTb9fbd8o8iqiEMUDse2n"
+program = "tests/fixtures/world.so"
+upgradeable = false
+
+[test.validator]
+bind_address = "0.0.0.0"
+url = "https://rpc.magicblock.app/devnet/"
+ledger = ".bolt/test-ledger"
+rpc_port = 8899
+
+[[test.validator.account]]
+address = "EHLkWwAT9oebVv9ht3mtqrvHhRVMKrt54tF3MfHTey2K"
+filename = "tests/fixtures/registry.json"
