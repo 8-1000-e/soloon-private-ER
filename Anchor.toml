@@ -6,28 +6,14 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-commit_action = "EtF5LQ9tAfbBD7ez4GxP3S4AbTRFZupdw6PFLB4qtfL4"
-create_match = "EaXW3WKMewu7hzeDCJX4phpQj75uWtNse8aaqyAsguPy"
-end_match = "63aHmRtezLwdybGnSLDYU679CTFUB9JMhQfbst1zA5sb"
+game_state = "Cv8E8HLY9u5GdJsWYd4AKfgvMRAjUrnxypdkQngi4Umd"
 lobby = "4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB"
-match_config = "35GEdGYpCaZfafmtQoea5pgz4Y2G2ciYQXjwDm7dCGYv"
-match_state = "AKnxJJqzHKy99bD2gqM5YdjSHMEbwDYrk69mzd2pb52Y"
-players = "2mwqV9NyisXsRgKFQC62Ne1JhNLSYKxD2GuD75W7Rgcz"
-resolve_turn = "DjN7EguTF3dhZ3S1ueFZDFNB4VeEXruPRdVJQ9LbMqZ"
-reveal_action = "3QSqmCakjVv3qGY4oD7hNzTHHE2LQQByU6Yj5iybkmxh"
-turn_data = "DCwYD9hZjpL3RhnhYo3fLWby6YxahjeQ5Gd9ggsp9Mhi"
+soloon_game = "ZH7BDgpKKEfY24YhkRcpZ54EpjtLdhHVRvZa5S4YjSd"
 
 [programs.devnet]
-commit_action = "EtF5LQ9tAfbBD7ez4GxP3S4AbTRFZupdw6PFLB4qtfL4"
-create_match = "EaXW3WKMewu7hzeDCJX4phpQj75uWtNse8aaqyAsguPy"
-end_match = "63aHmRtezLwdybGnSLDYU679CTFUB9JMhQfbst1zA5sb"
+game_state = "Cv8E8HLY9u5GdJsWYd4AKfgvMRAjUrnxypdkQngi4Umd"
 lobby = "4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB"
-match_config = "35GEdGYpCaZfafmtQoea5pgz4Y2G2ciYQXjwDm7dCGYv"
-match_state = "AKnxJJqzHKy99bD2gqM5YdjSHMEbwDYrk69mzd2pb52Y"
-players = "2mwqV9NyisXsRgKFQC62Ne1JhNLSYKxD2GuD75W7Rgcz"
-resolve_turn = "DjN7EguTF3dhZ3S1ueFZDFNB4VeEXruPRdVJQ9LbMqZ"
-reveal_action = "3QSqmCakjVv3qGY4oD7hNzTHHE2LQQByU6Yj5iybkmxh"
-turn_data = "DCwYD9hZjpL3RhnhYo3fLWby6YxahjeQ5Gd9ggsp9Mhi"
+soloon_game = "ZH7BDgpKKEfY24YhkRcpZ54EpjtLdhHVRvZa5S4YjSd"
 
 [registry]
 url = "https://api.apr.dev"

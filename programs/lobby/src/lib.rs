@@ -9,6 +9,12 @@ const STATUS_STARTED: u8 = 1;
 const STATUS_FINISHED: u8 = 2;
 const STATUS_CANCELLED: u8 = 3;
 
+// House address: receives 5% rake on normal wins, 100% on timeout
+const RAKE_AUTHORITY: Pubkey = pubkey!("J3WUUZagmoqLKJueWB2CQeUiWcbe4LmeAD9qujB6xz1B");
+
+// Rake: 10% (expressed as basis points out of 10_000)
+const RAKE_BPS: u64 = 500;
+
 #[error_code]
 pub enum LobbyError {
     #[msg("Lobby is not open")]
@@ -33,6 +39,10 @@ pub enum LobbyError {
     InvalidMaxPlayers,
     #[msg("Unauthorized")]
     Unauthorized,
+    #[msg("Invalid rake authority account")]
+    InvalidRakeAuthority,
+    #[msg("Cannot close lobby: pot is not empty")]
+    PotNotEmpty,
 }
 
 // Account size: 8 discriminator + 32 authority + 8 lobby_id + 8 entry_fee
@@ -220,57 +230,97 @@ pub mod lobby {
         Ok(())
     }
 
-    /// Authority distributes the pot to one or more winners (split equally).
-    /// winner_indices: seat indices in lobby.players[].
+    /// Authority distributes the pot to one or more winners.
+    ///
+    /// - `is_timeout`: if true, the match hit the 100-turn limit — the full pot
+    ///   goes to the hardcoded RAKE_AUTHORITY (house) with no rake split.
+    /// - Otherwise: 10% rake goes to RAKE_AUTHORITY, 90% is split equally
+    ///   among the listed winners.
+    ///
+    /// `winner_indices`: seat indices in lobby.players[].
     /// Winner accounts must be passed as remaining_accounts in the same order, all writable.
+    /// `rake_authority` account must match the hardcoded RAKE_AUTHORITY address.
     pub fn distribute_prize(
         ctx: Context<DistributePrize>,
         _lobby_id: u64,
         winner_indices: Vec<u8>,
+        is_timeout: bool,
     ) -> Result<()> {
+        require!(
+            ctx.accounts.rake_authority.key() == RAKE_AUTHORITY,
+            LobbyError::InvalidRakeAuthority
+        );
+
         let lobby = &ctx.accounts.lobby;
         require!(lobby.status == STATUS_STARTED, LobbyError::MatchNotStarted);
-        require!(!winner_indices.is_empty(), LobbyError::InvalidWinnerIndex);
-        require!(
-            winner_indices.len() == ctx.remaining_accounts.len(),
-            LobbyError::WrongWinner
-        );
-
-        // Validate every index and matching account upfront
-        for (&idx, acc) in winner_indices.iter().zip(ctx.remaining_accounts.iter()) {
-            require!(
-                (idx as usize) < lobby.player_count as usize,
-                LobbyError::InvalidWinnerIndex
-            );
-            require!(
-                lobby.players[idx as usize] == acc.key(),
-                LobbyError::WrongWinner
-            );
-        }
 
         let pot = lobby.pot;
-        let n = winner_indices.len() as u64;
-        let share = pot / n;
-        let remainder = pot % n; // goes to first winner
-
         let lobby_info = ctx.accounts.lobby.to_account_info();
-        for (i, acc) in ctx.remaining_accounts.iter().enumerate() {
-            let amount = if i == 0 { share + remainder } else { share };
-            **lobby_info.try_borrow_mut_lamports()? -= amount;
-            **acc.try_borrow_mut_lamports()? += amount;
+        let rake_info = ctx.accounts.rake_authority.to_account_info();
+
+        if is_timeout {
+            // Full pot goes to house — game lasted over 100 turns
+            **lobby_info.try_borrow_mut_lamports()? -= pot;
+            **rake_info.try_borrow_mut_lamports()? += pot;
+
+            let lobby = &mut ctx.accounts.lobby;
+            lobby.status = STATUS_FINISHED;
+            lobby.pot = 0;
+
+            msg!(
+                "Lobby {} timed out. {} lamports → house.",
+                lobby.lobby_id,
+                pot
+            );
+        } else {
+            require!(!winner_indices.is_empty(), LobbyError::InvalidWinnerIndex);
+            require!(
+                winner_indices.len() == ctx.remaining_accounts.len(),
+                LobbyError::WrongWinner
+            );
+
+            // Validate every index and matching account upfront
+            for (&idx, acc) in winner_indices.iter().zip(ctx.remaining_accounts.iter()) {
+                require!(
+                    (idx as usize) < lobby.player_count as usize,
+                    LobbyError::InvalidWinnerIndex
+                );
+                require!(
+                    lobby.players[idx as usize] == acc.key(),
+                    LobbyError::WrongWinner
+                );
+            }
+
+            // 10% rake to house
+            let rake = pot * RAKE_BPS / 10_000;
+            let prize = pot - rake;
+            let n = winner_indices.len() as u64;
+            let share = prize / n;
+            let remainder = prize % n; // goes to first winner
+
+            **lobby_info.try_borrow_mut_lamports()? -= rake;
+            **rake_info.try_borrow_mut_lamports()? += rake;
+
+            for (i, acc) in ctx.remaining_accounts.iter().enumerate() {
+                let amount = if i == 0 { share + remainder } else { share };
+                **lobby_info.try_borrow_mut_lamports()? -= amount;
+                **acc.try_borrow_mut_lamports()? += amount;
+            }
+
+            let lobby = &mut ctx.accounts.lobby;
+            lobby.status = STATUS_FINISHED;
+            lobby.pot = 0;
+
+            msg!(
+                "Lobby {} finished. Rake: {} lamports. {} winner(s) split {} lamports ({} each).",
+                lobby.lobby_id,
+                rake,
+                n,
+                prize,
+                share
+            );
         }
 
-        let lobby = &mut ctx.accounts.lobby;
-        lobby.status = STATUS_FINISHED;
-        lobby.pot = 0;
-
-        msg!(
-            "Lobby {} finished. {} winner(s) split {} lamports ({} each)",
-            lobby.lobby_id,
-            n,
-            pot,
-            share
-        );
         Ok(())
     }
 
@@ -339,6 +389,21 @@ pub mod lobby {
             entry_fee,
             lobby.lobby_id
         );
+        Ok(())
+    }
+
+    /// Authority closes a finished or cancelled lobby, reclaiming the rent.
+    /// The lobby account is closed and lamports returned to the authority.
+    /// Requires pot == 0 (prizes must be distributed or refunds claimed first).
+    pub fn close_lobby(ctx: Context<CloseLobby>, _lobby_id: u64) -> Result<()> {
+        let lobby = &ctx.accounts.lobby;
+        require!(
+            lobby.status == STATUS_FINISHED || lobby.status == STATUS_CANCELLED,
+            LobbyError::LobbyNotOpen
+        );
+        require!(lobby.pot == 0, LobbyError::PotNotEmpty);
+
+        msg!("Lobby {} closed, rent reclaimed", lobby.lobby_id);
         Ok(())
     }
 }
@@ -421,6 +486,10 @@ pub struct DistributePrize<'info> {
         has_one = authority @ LobbyError::Unauthorized
     )]
     pub lobby: Account<'info, LobbyAccount>,
+
+    /// CHECK: Address validated in instruction against hardcoded RAKE_AUTHORITY
+    #[account(mut)]
+    pub rake_authority: AccountInfo<'info>,
     // winner accounts passed as remaining_accounts (all writable)
 }
 
@@ -449,6 +518,22 @@ pub struct ClaimRefund<'info> {
         mut,
         seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
         bump = lobby.bump
+    )]
+    pub lobby: Account<'info, LobbyAccount>,
+}
+
+#[derive(Accounts)]
+#[instruction(lobby_id: u64)]
+pub struct CloseLobby<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
+        bump = lobby.bump,
+        has_one = authority @ LobbyError::Unauthorized,
+        close = authority
     )]
     pub lobby: Account<'info, LobbyAccount>,
 }
