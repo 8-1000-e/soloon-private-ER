@@ -1,12 +1,12 @@
 [package]
-name = "end-match"
+name = "game-state"
 version = "0.2.4"
-description = "Created with Bolt"
+description = "Unified game component — merges match_config, match_state, players, turn_data"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "end_match"
+name = "game_state"
 
 [features]
 no-entrypoint = []
@@ -19,9 +19,5 @@ anchor-debug = ["bolt-lang/anchor-debug"]
 custom-heap = []
 custom-panic = []
 
-
 [dependencies]
 bolt-lang.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-
-game-state = { path = "../../components/game-state", features = ["cpi"] }

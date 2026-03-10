@@ -24,7 +24,4 @@ custom-panic = []
 bolt-lang.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 
-match-config = { path = "../../components/match-config", features = ["cpi"] }
-match-state = { path = "../../components/match-state", features = ["cpi"] }
-players = { path = "../../components/players", features = ["cpi"] }
-turn-data = { path = "../../components/turn-data", features = ["cpi"] }
+game-state = { path = "../../components/game-state", features = ["cpi"] }

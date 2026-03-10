@@ -634,11 +634,8 @@ name = "commit-action"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "match-config",
- "match-state",
- "players",
+ "game-state",
  "serde",
- "turn-data",
 ]
 
 [[package]]
@@ -687,12 +684,9 @@ name = "create-match"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "match-config",
- "match-state",
- "players",
+ "game-state",
  "serde",
  "solana-sha256-hasher 2.3.0",
- "turn-data",
 ]
 
 [[package]]
@@ -855,11 +849,8 @@ name = "end-match"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "match-config",
- "match-state",
- "players",
+ "game-state",
  "serde",
- "turn-data",
 ]
 
 [[package]]
@@ -1011,6 +1002,13 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "game-state"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+]
 
 [[package]]
 name = "generic-array"
@@ -1557,12 +1555,9 @@ name = "resolve-turn"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "match-config",
- "match-state",
- "players",
+ "game-state",
  "serde",
  "solana-sha256-hasher 2.3.0",
- "turn-data",
 ]
 
 [[package]]
@@ -1570,12 +1565,9 @@ name = "reveal-action"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "match-config",
- "match-state",
- "players",
+ "game-state",
  "serde",
  "solana-sha256-hasher 2.3.0",
- "turn-data",
 ]
 
 [[package]]
