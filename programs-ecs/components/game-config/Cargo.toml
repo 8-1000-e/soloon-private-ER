@@ -1,12 +1,12 @@
 [package]
-name = "soloon-game"
+name = "game-config"
 version = "0.2.4"
-description = "Merged Soloon game system (create, commit, reveal, resolve, end)"
+description = "Soloon match-level state: status, phase, turn, deadlines, config, winners."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "soloon_game"
+name = "game_config"
 
 [features]
 no-entrypoint = []
@@ -21,6 +21,3 @@ custom-panic = []
 
 [dependencies]
 bolt-lang.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-game-state = { path = "../../components/game-state", features = ["cpi"] }
-solana-sha256-hasher = "2.3"

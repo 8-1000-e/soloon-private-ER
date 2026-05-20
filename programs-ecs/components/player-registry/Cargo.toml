@@ -1,12 +1,12 @@
 [package]
-name = "match-config"
+name = "player-registry"
 version = "0.2.4"
-description = "Created with Bolt"
+description = "Soloon per-match list of (player authority, PlayerState PDA) pairs."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "match_config"
+name = "player_registry"
 
 [features]
 no-entrypoint = []

@@ -1,12 +1,12 @@
 [package]
-name = "match-state"
+name = "player-state"
 version = "0.2.4"
-description = "Created with Bolt"
+description = "Soloon per-player state: inventory, hits, locks, this turn's submitted action."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "match_state"
+name = "player_state"
 
 [features]
 no-entrypoint = []
