@@ -53,4 +53,4 @@ pub const STATUS_CANCELLED: u8 = 3;
 /// Must match `declare_id!` in
 /// `programs-ecs/components/game-config/src/lib.rs`.
 pub const GAME_CONFIG_PROGRAM_ID: Pubkey =
-    anchor_lang::pubkey!("F5Sm5SQ5tCyq1SM9U3QBUR2dEQNfeVdXztmduF17rrt4");
+    anchor_lang::pubkey!("EcDbJA6zALpmc6te6r9CTpYHJgLYU9YhPJcTsMcPannB");

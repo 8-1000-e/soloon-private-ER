@@ -19,11 +19,22 @@ pub enum GameError {
     AlreadyJoined,
     #[msg("PlayerRegistry.match_id doesn't match GameConfig.match_id — wrong registry for this match")]
     RegistryMatchIdMismatch,
+    #[msg("spawn-player called without the player wallet in remaining_accounts.last()")]
+    MissingPlayerAuthority,
 }
 
-/// Register a new player in the match. Run once per join — the lobby
-/// program triggers it as part of `join_lobby` after escrowing the
-/// entry fee on the base chain.
+/// Register a new player in the match. Run once per join — the back
+/// fires it on behalf of every confirmed lobby member after the
+/// `join_lobby` Anchor ix has settled on L1.
+///
+/// Auth model:
+///   The TX signer is the BACK (it orchestrates `setupMatch` for every
+///   match), NOT the player wallet. The actual player wallet is
+///   supplied as `remaining_accounts.last()` — read-only, no signing
+///   required. The back is trusted to source these pubkeys from the
+///   on-chain `LobbyAccount.players[]` roster (already validated by
+///   the lobby program). This mirrors the trade-fight / stay-calm
+///   spawn-player pattern.
 ///
 /// Components touched:
 /// - `player_state`     — freshly initialised, attached to a brand-new
@@ -32,12 +43,6 @@ pub enum GameError {
 /// - `game_config`      — bumps `active_players` + `alive_count`.
 /// - `player_registry`  — appends the authority + the new PlayerState
 ///                        PDA at index `count`, then bumps `count`.
-///
-/// The signer (`ctx.accounts.authority`) is recorded as the
-/// PlayerState's `authority`. We do NOT support session-key delegation
-/// for now — the authority is the player's wallet directly. (If we add
-/// session keys later, mirror trade-fight's `owner` field with the
-/// owner pubkey pulled from `remaining_accounts`.)
 #[system]
 pub mod spawn_player {
     pub fn execute(ctx: Context<Components>, _args_p: Vec<u8>) -> Result<Components> {
@@ -59,6 +64,17 @@ pub mod spawn_player {
             GameError::RegistryMatchIdMismatch
         );
 
+        // ── Player authority comes from `remaining_accounts.last()` —
+        //    the back appends it after the per-system component slots.
+        //    Bolt's #[system] macro consumes the prepended component
+        //    accounts; whatever's left is the system's own
+        //    `remaining_accounts`, which is where we look. ─────────────
+        let player_authority_info = ctx
+            .remaining_accounts
+            .last()
+            .ok_or(GameError::MissingPlayerAuthority)?;
+        let authority_bytes = player_authority_info.key.to_bytes();
+
         // ── Capacity check against the per-match max_players, not the
         //    hard MAX_PLAYERS cap (game-config bounds-checked the user-
         //    supplied max at init-game time, so we only need this one). ─
@@ -69,7 +85,6 @@ pub mod spawn_player {
         // ── Dedup: same authority can't claim two seats. Linear scan
         //    over `count` slots — Vec is pre-sized to MAX_PLAYERS but
         //    only the prefix [0..count) carries real entries. ──────────
-        let authority_bytes = ctx.accounts.authority.key.to_bytes();
         for i in 0..idx {
             if ctx.accounts.player_registry.players[i] == authority_bytes {
                 return err!(GameError::AlreadyJoined);
@@ -78,7 +93,7 @@ pub mod spawn_player {
 
         // ── Initialise the fresh PlayerState. ──────────────────────────
         let p = &mut ctx.accounts.player_state;
-        p.authority     = *ctx.accounts.authority.key;
+        p.authority     = *player_authority_info.key;
         p.seat          = idx as u8;
         p.alive         = true;
         p.bullets       = 1;
