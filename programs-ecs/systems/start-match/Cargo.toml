@@ -1,12 +1,12 @@
 [package]
-name = "commit-action"
+name = "start-match"
 version = "0.2.4"
-description = "Created with Bolt"
+description = "Locks a Soloon lobby, flips it to RUNNING, opens the first turn."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "commit_action"
+name = "start_match"
 
 [features]
 no-entrypoint = []
@@ -19,9 +19,6 @@ anchor-debug = ["bolt-lang/anchor-debug"]
 custom-heap = []
 custom-panic = []
 
-
 [dependencies]
 bolt-lang.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-
-game-state = { path = "../../components/game-state", features = ["cpi"] }
+game-config = { path = "../../components/game-config", features = ["cpi"] }

@@ -74,12 +74,65 @@ pub struct GameConfig {
     #[max_len(MAX_PLAYERS)]
     pub winners: Vec<[u8; 32]>,
     pub winner_count: u8,
+
+    // ── Resolve-phase coordination ─────────────────────────────────────
+    /// Per-seat resolution effects written by `resolve-turn` (the
+    /// COMPUTE pass) and consumed by `apply-turn` (the per-player APPLY
+    /// pass). Bolt only mutates components listed in `#[system_input]`,
+    /// so we can't write to N `PlayerState`s atomically from one
+    /// system — instead we snapshot the post-resolution state per seat
+    /// here, then the cranker fires `apply-turn` once per player to
+    /// land each PlayerState individually.
+    ///
+    /// Layout: `pending_effects[seat]` carries the FINAL values for
+    /// that seat's PlayerState after the turn resolves. Indexed by
+    /// `PlayerState.seat`, which is stable for the whole match.
+    #[max_len(MAX_PLAYERS)]
+    pub pending_effects: Vec<PendingEffect>,
+    /// Number of `apply-turn` invocations completed for the current
+    /// pending resolve. When this hits `active_players`, the apply
+    /// pass is done; the LAST `apply-turn` call flips `phase` back to
+    /// `Turn` and is the one that actually writes the next-turn state.
+    pub apply_count: u8,
 }
 
-/// Cap on simultaneous players in one match. Bolt return-data is limited
-/// to 1024 bytes so we mirror trade-fight's cap; Soloon's mechanics work
-/// fine in the 2–10 range.
-pub const MAX_PLAYERS: usize = 10;
+/// Post-resolution snapshot for one seat. Written wholesale by
+/// `resolve-turn`; copied verbatim onto each PlayerState by
+/// `apply-turn`. Carries the FINAL field values, not deltas — keeps
+/// the apply logic a trivial memcpy with zero arithmetic.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, InitSpace)]
+pub struct PendingEffect {
+    pub bullets: u8,
+    pub mirrors: u8,
+    pub hits_received: u8,
+    pub protect_lock: u8,
+    /// New alive flag — `false` once the seat takes its third hit
+    /// (or whatever death threshold the future variants pick).
+    pub alive: bool,
+    /// `true` once `apply-turn` has consumed this slot. Stops a
+    /// re-call from double-applying the same effect.
+    pub applied: bool,
+}
+
+impl Default for PendingEffect {
+    fn default() -> Self {
+        Self {
+            bullets: 0,
+            mirrors: 0,
+            hits_received: 0,
+            protect_lock: 0,
+            alive: false,
+            applied: false,
+        }
+    }
+}
+
+/// Cap on simultaneous players in one match. Soloon's mechanics (3-hit
+/// death threshold, no-loot mirror cap, fast turns) were designed
+/// around 2–4 player rounds — short matches keep tension high and a
+/// 4-player wipe-simultané tie-break stays sane. Bumping this means
+/// re-tuning death threshold + bullet cap to avoid drag.
+pub const MAX_PLAYERS: usize = 4;
 
 impl Default for GameConfig {
     fn default() -> Self {
@@ -102,6 +155,8 @@ impl Default for GameConfig {
             win_mode: 0,
             winners: Vec::new(),
             winner_count: 0,
+            pending_effects: vec![PendingEffect::default(); MAX_PLAYERS],
+            apply_count: 0,
             bolt_metadata: BoltMetadata::default(),
         }
     }

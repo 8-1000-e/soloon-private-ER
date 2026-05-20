@@ -1,0 +1,28 @@
+[package]
+name = "submit-action"
+version = "0.2.4"
+description = "Player submits this turn's action (action_type + target) directly. State stays private inside the TEE-resident ER."
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "submit_action"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["bolt-lang/idl-build"]
+anchor-debug = ["bolt-lang/anchor-debug"]
+custom-heap = []
+custom-panic = []
+
+[dependencies]
+bolt-lang.workspace = true
+# `#[arguments]` macro expands to a `serde::Deserialize` derive — keep
+# serde here even though we never write `serde::` in the source.
+serde = { version = "1.0", features = ["derive"] }
+game-config = { path = "../../components/game-config", features = ["cpi"] }
+player-state = { path = "../../components/player-state", features = ["cpi"] }

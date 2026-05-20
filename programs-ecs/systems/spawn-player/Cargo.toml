@@ -1,12 +1,12 @@
 [package]
-name = "resolve-turn"
+name = "spawn-player"
 version = "0.2.4"
-description = "Compute pass: reads every PlayerState raw, resolves the turn, snapshots per-seat results into GameConfig.pending_effects."
+description = "Registers a new player in a Soloon match (creates PlayerState, appends to PlayerRegistry)."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "resolve_turn"
+name = "spawn_player"
 
 [features]
 no-entrypoint = []
@@ -22,3 +22,5 @@ custom-panic = []
 [dependencies]
 bolt-lang.workspace = true
 game-config = { path = "../../components/game-config", features = ["cpi"] }
+player-registry = { path = "../../components/player-registry", features = ["cpi"] }
+player-state = { path = "../../components/player-state", features = ["cpi"] }

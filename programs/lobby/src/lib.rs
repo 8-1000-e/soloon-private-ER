@@ -1,539 +1,81 @@
 use anchor_lang::prelude::*;
-use anchor_lang::system_program;
 
-declare_id!("4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB");
+pub mod constants;
+pub mod errors;
+pub mod instructions;
+pub mod state;
 
-// Status constants
-const STATUS_OPEN: u8 = 0;
-const STATUS_STARTED: u8 = 1;
-const STATUS_FINISHED: u8 = 2;
-const STATUS_CANCELLED: u8 = 3;
+pub use instructions::*;
 
-// House address: receives 5% rake on normal wins, 100% on timeout
-const RAKE_AUTHORITY: Pubkey = pubkey!("J3WUUZagmoqLKJueWB2CQeUiWcbe4LmeAD9qujB6xz1B");
+declare_id!("ME4mKRb4XBeFkzxsyiHEjd82Lx5cX4BUudXpno2C6DL");
 
-// Rake: 10% (expressed as basis points out of 10_000)
-const RAKE_BPS: u64 = 500;
-
-#[error_code]
-pub enum LobbyError {
-    #[msg("Lobby is not open")]
-    LobbyNotOpen,
-    #[msg("Lobby is full")]
-    LobbyFull,
-    #[msg("Player already joined")]
-    AlreadyJoined,
-    #[msg("Player not found in lobby")]
-    PlayerNotFound,
-    #[msg("Not enough players to start (min 2)")]
-    NotEnoughPlayers,
-    #[msg("Match already started")]
-    MatchAlreadyStarted,
-    #[msg("Match not started")]
-    MatchNotStarted,
-    #[msg("Invalid winner index")]
-    InvalidWinnerIndex,
-    #[msg("Winner account does not match")]
-    WrongWinner,
-    #[msg("max_players must be between 2 and 4")]
-    InvalidMaxPlayers,
-    #[msg("Unauthorized")]
-    Unauthorized,
-    #[msg("Invalid rake authority account")]
-    InvalidRakeAuthority,
-    #[msg("Cannot close lobby: pot is not empty")]
-    PotNotEmpty,
-}
-
-// Account size: 8 discriminator + 32 authority + 8 lobby_id + 8 entry_fee
-//               + 1 max_players + 4*32 players + 1 player_count
-//               + 1 status + 8 pot + 32 match_entity + 1 bump
-// = 8 + 32 + 8 + 8 + 1 + 128 + 1 + 1 + 8 + 32 + 1 = 228
-pub const LOBBY_SIZE: usize = 228;
-
-#[account]
-pub struct LobbyAccount {
-    pub authority: Pubkey,       // 32 – must sign create/start/distribute/cancel
-    pub lobby_id: u64,           // 8
-    pub entry_fee: u64,          // 8  – lamports per player (e.g. 10_000_000 = 0.01 SOL)
-    pub max_players: u8,         // 1  – 2..=4
-    pub players: [Pubkey; 4],    // 128 – registered player wallets
-    pub player_count: u8,        // 1
-    pub status: u8,              // 1  – 0=Open,1=Started,2=Finished,3=Cancelled
-    pub pot: u64,                // 8  – total lamports collected (entry_fee * player_count)
-    pub match_entity: Pubkey,    // 32 – BOLT entity PDA set on start_match
-    pub bump: u8,                // 1
-}
-
+/// Soloon match lobby — escrow + roster + payout.
+///
+/// Flow:
+///   1. `create_lobby` — authority opens a fresh lobby + vault PDA pair
+///      keyed by `lobby_id`. Status starts at OPEN.
+///   2. `join_lobby` — players pay the entry fee into the vault and
+///      claim a seat. Linear-scan dedup. Caps at `lobby.max_players`.
+///   3. `leave_lobby` — pre-start exit. Refunds `entry_fee - LEAVE_FEE`;
+///      the small fee stays in the pot.
+///   4. `start_match` — authority locks the lobby, records the Bolt
+///      entity that hosts the match's ECS components, flips status to
+///      STARTED. No more joins/leaves.
+///   5. `distribute_prize` — authority calls AFTER the ECS layer has
+///      resolved the match (= GameConfig.status == Finished). Reads
+///      `GameConfig.winners` directly on-chain (verifies owner + entity
+///      tie), takes the 5% rake, splits the rest 95% equally among the
+///      listed winners. PER-aware: nothing about who-won is trusted to
+///      the caller — the canonical source is GameConfig.
+///   6. `cancel_lobby` — authority bails out (open OR started). Status
+///      → CANCELLED.
+///   7. `claim_refund` — per-player refund path for cancelled lobbies.
+///   8. `close_lobby` — authority reclaims rent. Vault must be empty.
 #[program]
 pub mod lobby {
     use super::*;
 
-    /// Authority creates a lobby with a fixed entry fee and max player count.
     pub fn create_lobby(
         ctx: Context<CreateLobby>,
         lobby_id: u64,
         entry_fee: u64,
         max_players: u8,
     ) -> Result<()> {
-        require!(
-            max_players >= 2 && max_players <= 4,
-            LobbyError::InvalidMaxPlayers
-        );
-
-        let lobby = &mut ctx.accounts.lobby;
-        lobby.authority = ctx.accounts.authority.key();
-        lobby.lobby_id = lobby_id;
-        lobby.entry_fee = entry_fee;
-        lobby.max_players = max_players;
-        lobby.players = [Pubkey::default(); 4];
-        lobby.player_count = 0;
-        lobby.status = STATUS_OPEN;
-        lobby.pot = 0;
-        lobby.match_entity = Pubkey::default();
-        lobby.bump = ctx.bumps.lobby;
-
-        msg!(
-            "Lobby {} created: entry_fee={} lamports, max_players={}",
-            lobby_id,
-            entry_fee,
-            max_players
-        );
-        Ok(())
+        instructions::create_lobby::create_lobby(ctx, lobby_id, entry_fee, max_players)
     }
 
-    /// Player joins the lobby by transferring the entry fee.
-    pub fn join_lobby(ctx: Context<JoinLobby>, _lobby_id: u64) -> Result<()> {
-        let player_key = ctx.accounts.player.key();
-
-        // All checks before mutably borrowing lobby
-        {
-            let lobby = &ctx.accounts.lobby;
-            require!(lobby.status == STATUS_OPEN, LobbyError::LobbyNotOpen);
-            require!(
-                lobby.player_count < lobby.max_players,
-                LobbyError::LobbyFull
-            );
-            for i in 0..lobby.player_count as usize {
-                require!(lobby.players[i] != player_key, LobbyError::AlreadyJoined);
-            }
-        }
-
-        let entry_fee = ctx.accounts.lobby.entry_fee;
-
-        // Transfer entry_fee from player → lobby PDA via system program CPI
-        system_program::transfer(
-            CpiContext::new(
-                ctx.accounts.system_program.to_account_info(),
-                system_program::Transfer {
-                    from: ctx.accounts.player.to_account_info(),
-                    to: ctx.accounts.lobby.to_account_info(),
-                },
-            ),
-            entry_fee,
-        )?;
-
-        let lobby = &mut ctx.accounts.lobby;
-        let seat = lobby.player_count as usize;
-        lobby.players[seat] = player_key;
-        lobby.player_count += 1;
-        lobby.pot += entry_fee;
-
-        msg!(
-            "Player {} joined lobby {} ({}/{}). Pot: {} lamports",
-            player_key,
-            lobby.lobby_id,
-            lobby.player_count,
-            lobby.max_players,
-            lobby.pot
-        );
-        Ok(())
+    pub fn join_lobby(ctx: Context<JoinLobby>, lobby_id: u64) -> Result<()> {
+        instructions::join_lobby::join_lobby(ctx, lobby_id)
     }
 
-    /// Player leaves the lobby before the match starts and gets a full refund.
-    pub fn leave_lobby(ctx: Context<LeaveLobby>, _lobby_id: u64) -> Result<()> {
-        let player_key = ctx.accounts.player.key();
-
-        // Find player index
-        let player_index = {
-            let lobby = &ctx.accounts.lobby;
-            require!(lobby.status == STATUS_OPEN, LobbyError::LobbyNotOpen);
-            let mut found = None;
-            for i in 0..lobby.player_count as usize {
-                if lobby.players[i] == player_key {
-                    found = Some(i);
-                    break;
-                }
-            }
-            found.ok_or(LobbyError::PlayerNotFound)?
-        };
-
-        let entry_fee = ctx.accounts.lobby.entry_fee;
-
-        // Refund: lobby PDA → player (direct lamport manipulation, PDA is program-owned)
-        **ctx
-            .accounts
-            .lobby
-            .to_account_info()
-            .try_borrow_mut_lamports()? -= entry_fee;
-        **ctx
-            .accounts
-            .player
-            .to_account_info()
-            .try_borrow_mut_lamports()? += entry_fee;
-
-        // Remove player from array (swap with last)
-        let lobby = &mut ctx.accounts.lobby;
-        let last = (lobby.player_count - 1) as usize;
-        lobby.players[player_index] = lobby.players[last];
-        lobby.players[last] = Pubkey::default();
-        lobby.player_count -= 1;
-        lobby.pot -= entry_fee;
-
-        msg!(
-            "Player {} left lobby {}. Pot: {} lamports",
-            player_key,
-            lobby.lobby_id,
-            lobby.pot
-        );
-        Ok(())
+    pub fn leave_lobby(ctx: Context<LeaveLobby>, lobby_id: u64) -> Result<()> {
+        instructions::leave_lobby::leave_lobby(ctx, lobby_id)
     }
 
-    /// Authority starts the match once enough players have joined.
-    /// Records the BOLT entity PDA for cross-reference.
     pub fn start_match(
         ctx: Context<StartMatch>,
-        _lobby_id: u64,
+        lobby_id: u64,
         match_entity: Pubkey,
     ) -> Result<()> {
-        let lobby = &mut ctx.accounts.lobby;
-        require!(
-            lobby.authority == ctx.accounts.authority.key(),
-            LobbyError::Unauthorized
-        );
-        require!(lobby.status == STATUS_OPEN, LobbyError::LobbyNotOpen);
-        require!(
-            lobby.player_count >= 2,
-            LobbyError::NotEnoughPlayers
-        );
-
-        lobby.status = STATUS_STARTED;
-        lobby.match_entity = match_entity;
-
-        msg!(
-            "Lobby {} → match started. Entity: {}, {} players, pot: {} lamports",
-            lobby.lobby_id,
-            match_entity,
-            lobby.player_count,
-            lobby.pot
-        );
-        Ok(())
+        instructions::start_match::start_match(ctx, lobby_id, match_entity)
     }
 
-    /// Authority distributes the pot to one or more winners.
-    ///
-    /// - `is_timeout`: if true, the match hit the 100-turn limit — the full pot
-    ///   goes to the hardcoded RAKE_AUTHORITY (house) with no rake split.
-    /// - Otherwise: 10% rake goes to RAKE_AUTHORITY, 90% is split equally
-    ///   among the listed winners.
-    ///
-    /// `winner_indices`: seat indices in lobby.players[].
-    /// Winner accounts must be passed as remaining_accounts in the same order, all writable.
-    /// `rake_authority` account must match the hardcoded RAKE_AUTHORITY address.
     pub fn distribute_prize(
         ctx: Context<DistributePrize>,
-        _lobby_id: u64,
-        winner_indices: Vec<u8>,
-        is_timeout: bool,
+        lobby_id: u64,
     ) -> Result<()> {
-        require!(
-            ctx.accounts.rake_authority.key() == RAKE_AUTHORITY,
-            LobbyError::InvalidRakeAuthority
-        );
-
-        let lobby = &ctx.accounts.lobby;
-        require!(lobby.status == STATUS_STARTED, LobbyError::MatchNotStarted);
-
-        let pot = lobby.pot;
-        let lobby_info = ctx.accounts.lobby.to_account_info();
-        let rake_info = ctx.accounts.rake_authority.to_account_info();
-
-        if is_timeout {
-            // Full pot goes to house — game lasted over 100 turns
-            **lobby_info.try_borrow_mut_lamports()? -= pot;
-            **rake_info.try_borrow_mut_lamports()? += pot;
-
-            let lobby = &mut ctx.accounts.lobby;
-            lobby.status = STATUS_FINISHED;
-            lobby.pot = 0;
-
-            msg!(
-                "Lobby {} timed out. {} lamports → house.",
-                lobby.lobby_id,
-                pot
-            );
-        } else {
-            require!(!winner_indices.is_empty(), LobbyError::InvalidWinnerIndex);
-            require!(
-                winner_indices.len() == ctx.remaining_accounts.len(),
-                LobbyError::WrongWinner
-            );
-
-            // Validate every index and matching account upfront
-            for (&idx, acc) in winner_indices.iter().zip(ctx.remaining_accounts.iter()) {
-                require!(
-                    (idx as usize) < lobby.player_count as usize,
-                    LobbyError::InvalidWinnerIndex
-                );
-                require!(
-                    lobby.players[idx as usize] == acc.key(),
-                    LobbyError::WrongWinner
-                );
-            }
-
-            // 10% rake to house
-            let rake = pot * RAKE_BPS / 10_000;
-            let prize = pot - rake;
-            let n = winner_indices.len() as u64;
-            let share = prize / n;
-            let remainder = prize % n; // goes to first winner
-
-            **lobby_info.try_borrow_mut_lamports()? -= rake;
-            **rake_info.try_borrow_mut_lamports()? += rake;
-
-            for (i, acc) in ctx.remaining_accounts.iter().enumerate() {
-                let amount = if i == 0 { share + remainder } else { share };
-                **lobby_info.try_borrow_mut_lamports()? -= amount;
-                **acc.try_borrow_mut_lamports()? += amount;
-            }
-
-            let lobby = &mut ctx.accounts.lobby;
-            lobby.status = STATUS_FINISHED;
-            lobby.pot = 0;
-
-            msg!(
-                "Lobby {} finished. Rake: {} lamports. {} winner(s) split {} lamports ({} each).",
-                lobby.lobby_id,
-                rake,
-                n,
-                prize,
-                share
-            );
-        }
-
-        Ok(())
+        instructions::distribute_prize::distribute_prize(ctx, lobby_id)
     }
 
-    /// Authority cancels an open lobby. Players call leave_lobby individually
-    /// to reclaim their deposits (status=Cancelled allows leave_lobby).
-    pub fn cancel_lobby(ctx: Context<CancelLobby>, _lobby_id: u64) -> Result<()> {
-        let lobby = &mut ctx.accounts.lobby;
-        require!(
-            lobby.authority == ctx.accounts.authority.key(),
-            LobbyError::Unauthorized
-        );
-        // Allow cancellation if open OR started (before prize distributed)
-        require!(
-            lobby.status == STATUS_OPEN || lobby.status == STATUS_STARTED,
-            LobbyError::LobbyNotOpen
-        );
-
-        lobby.status = STATUS_CANCELLED;
-        msg!("Lobby {} cancelled", lobby.lobby_id);
-        Ok(())
+    pub fn cancel_lobby(ctx: Context<CancelLobby>, lobby_id: u64) -> Result<()> {
+        instructions::cancel_lobby::cancel_lobby(ctx, lobby_id)
     }
 
-    /// Player claims a refund after the lobby has been cancelled.
-    pub fn claim_refund(ctx: Context<ClaimRefund>, _lobby_id: u64) -> Result<()> {
-        let player_key = ctx.accounts.player.key();
-
-        let player_index = {
-            let lobby = &ctx.accounts.lobby;
-            require!(
-                lobby.status == STATUS_CANCELLED,
-                LobbyError::LobbyNotOpen
-            );
-            let mut found = None;
-            for i in 0..lobby.player_count as usize {
-                if lobby.players[i] == player_key {
-                    found = Some(i);
-                    break;
-                }
-            }
-            found.ok_or(LobbyError::PlayerNotFound)?
-        };
-
-        let entry_fee = ctx.accounts.lobby.entry_fee;
-
-        **ctx
-            .accounts
-            .lobby
-            .to_account_info()
-            .try_borrow_mut_lamports()? -= entry_fee;
-        **ctx
-            .accounts
-            .player
-            .to_account_info()
-            .try_borrow_mut_lamports()? += entry_fee;
-
-        let lobby = &mut ctx.accounts.lobby;
-        let last = (lobby.player_count - 1) as usize;
-        lobby.players[player_index] = lobby.players[last];
-        lobby.players[last] = Pubkey::default();
-        lobby.player_count -= 1;
-        lobby.pot -= entry_fee;
-
-        msg!(
-            "Refund: {} received {} lamports from cancelled lobby {}",
-            player_key,
-            entry_fee,
-            lobby.lobby_id
-        );
-        Ok(())
+    pub fn claim_refund(ctx: Context<ClaimRefund>, lobby_id: u64) -> Result<()> {
+        instructions::claim_refund::claim_refund(ctx, lobby_id)
     }
 
-    /// Authority closes a finished or cancelled lobby, reclaiming the rent.
-    /// The lobby account is closed and lamports returned to the authority.
-    /// Requires pot == 0 (prizes must be distributed or refunds claimed first).
-    pub fn close_lobby(ctx: Context<CloseLobby>, _lobby_id: u64) -> Result<()> {
-        let lobby = &ctx.accounts.lobby;
-        require!(
-            lobby.status == STATUS_FINISHED || lobby.status == STATUS_CANCELLED,
-            LobbyError::LobbyNotOpen
-        );
-        require!(lobby.pot == 0, LobbyError::PotNotEmpty);
-
-        msg!("Lobby {} closed, rent reclaimed", lobby.lobby_id);
-        Ok(())
+    pub fn close_lobby(ctx: Context<CloseLobby>, lobby_id: u64) -> Result<()> {
+        instructions::close_lobby::close_lobby(ctx, lobby_id)
     }
-}
-
-// ── Account Contexts ────────────────────────────────────────────────────────
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct CreateLobby<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        init,
-        payer = authority,
-        space = LOBBY_SIZE,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct JoinLobby<'info> {
-    #[account(mut)]
-    pub player: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct LeaveLobby<'info> {
-    #[account(mut)]
-    pub player: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct StartMatch<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump,
-        has_one = authority @ LobbyError::Unauthorized
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct DistributePrize<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump,
-        has_one = authority @ LobbyError::Unauthorized
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-
-    /// CHECK: Address validated in instruction against hardcoded RAKE_AUTHORITY
-    #[account(mut)]
-    pub rake_authority: AccountInfo<'info>,
-    // winner accounts passed as remaining_accounts (all writable)
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct CancelLobby<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump,
-        has_one = authority @ LobbyError::Unauthorized
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct ClaimRefund<'info> {
-    #[account(mut)]
-    pub player: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
-}
-
-#[derive(Accounts)]
-#[instruction(lobby_id: u64)]
-pub struct CloseLobby<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        mut,
-        seeds = [b"lobby", lobby_id.to_le_bytes().as_ref()],
-        bump = lobby.bump,
-        has_one = authority @ LobbyError::Unauthorized,
-        close = authority
-    )]
-    pub lobby: Account<'info, LobbyAccount>,
 }

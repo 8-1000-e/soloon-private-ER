@@ -5,7 +5,7 @@ use bolt_lang::*;
 //   `solana address -k target/deploy/player_state-keypair.json`
 // Then paste the resulting pubkey here AND in `Anchor.toml`. The address
 // below is a fresh placeholder so the workspace compiles.
-declare_id!("REGENME11111111111111111111111111111111111B");
+declare_id!("CpHKf8pn8VvBMjJAzEePyBAgNJSxofBQLySi3uTMDfA3");
 
 /// One PDA per player in a match. Holds the seat-local inventory, hit
 /// counters, protect cooldown, and the action the player is submitting

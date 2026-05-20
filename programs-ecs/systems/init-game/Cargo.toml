@@ -1,12 +1,12 @@
 [package]
-name = "resolve-turn"
+name = "init-game"
 version = "0.2.4"
-description = "Compute pass: reads every PlayerState raw, resolves the turn, snapshots per-seat results into GameConfig.pending_effects."
+description = "Initialises a Soloon match's GameConfig in the WAITING state."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "resolve_turn"
+name = "init_game"
 
 [features]
 no-entrypoint = []
@@ -21,4 +21,8 @@ custom-panic = []
 
 [dependencies]
 bolt-lang.workspace = true
+# `#[arguments]` macro expands to a `serde::Deserialize` derive — keep
+# serde here even though we never write `serde::` in the source.
+serde = { version = "1.0", features = ["derive"] }
 game-config = { path = "../../components/game-config", features = ["cpi"] }
+player-registry = { path = "../../components/player-registry", features = ["cpi"] }

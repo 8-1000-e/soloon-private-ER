@@ -229,6 +229,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 
 [[package]]
+name = "apply-turn"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "game-config",
+ "player-state",
+]
+
+[[package]]
 name = "arrayref"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -630,15 +639,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "commit-action"
-version = "0.2.4"
-dependencies = [
- "bolt-lang",
- "game-state",
- "serde",
-]
-
-[[package]]
 name = "console_error_panic_hook"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -677,16 +677,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "create-match"
-version = "0.2.4"
-dependencies = [
- "bolt-lang",
- "game-state",
- "serde",
- "solana-sha256-hasher 2.3.0",
 ]
 
 [[package]]
@@ -849,8 +839,7 @@ name = "end-match"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "game-state",
- "serde",
+ "game-config",
 ]
 
 [[package]]
@@ -1004,7 +993,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
-name = "game-state"
+name = "game-config"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
@@ -1112,6 +1101,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "init-game"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "game-config",
+ "player-registry",
+ "serde",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1213,6 +1212,7 @@ name = "lobby"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
+ "game-config",
 ]
 
 [[package]]
@@ -1252,20 +1252,6 @@ dependencies = [
  "bincode",
  "serde",
  "solana-program 2.3.0",
-]
-
-[[package]]
-name = "match-config"
-version = "0.2.4"
-dependencies = [
- "bolt-lang",
-]
-
-[[package]]
-name = "match-state"
-version = "0.2.4"
-dependencies = [
- "bolt-lang",
 ]
 
 [[package]]
@@ -1390,7 +1376,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "players"
+name = "player-registry"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+]
+
+[[package]]
+name = "player-state"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
@@ -1555,19 +1548,7 @@ name = "resolve-turn"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "game-state",
- "serde",
- "solana-sha256-hasher 2.3.0",
-]
-
-[[package]]
-name = "reveal-action"
-version = "0.2.4"
-dependencies = [
- "bolt-lang",
- "game-state",
- "serde",
- "solana-sha256-hasher 2.3.0",
+ "game-config",
 ]
 
 [[package]]
@@ -3253,13 +3234,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "soloon-game"
+name = "spawn-player"
 version = "0.2.4"
 dependencies = [
  "bolt-lang",
- "game-state",
- "serde",
- "solana-sha256-hasher 2.3.0",
+ "game-config",
+ "player-registry",
+ "player-state",
 ]
 
 [[package]]
@@ -3273,6 +3254,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "start-match"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "game-config",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3283,6 +3272,16 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "submit-action"
+version = "0.2.4"
+dependencies = [
+ "bolt-lang",
+ "game-config",
+ "player-state",
+ "serde",
+]
 
 [[package]]
 name = "subtle"
@@ -3452,13 +3451,6 @@ name = "tuple-conv"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1fd6314683350324c1bb3d71a65fbeacb4e870cb4faf30b28d8a7787fb8116dd"
-
-[[package]]
-name = "turn-data"
-version = "0.2.4"
-dependencies = [
- "bolt-lang",
-]
 
 [[package]]
 name = "typenum"

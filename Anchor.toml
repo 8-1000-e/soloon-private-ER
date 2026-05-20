@@ -1,19 +1,37 @@
 [toolchain]
-channel = "stable"
 
 [features]
 resolution = true
 skip-lint = false
 
 [programs.localnet]
-game_state = "Cv8E8HLY9u5GdJsWYd4AKfgvMRAjUrnxypdkQngi4Umd"
-lobby = "4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB"
-soloon_game = "ZH7BDgpKKEfY24YhkRcpZ54EpjtLdhHVRvZa5S4YjSd"
+# ── Components ────────────────────────────────────────────────
+# `game_config` reuses the old `game-state` keypair (functionally the
+# successor: match-level state) — keypair file is still
+# `target/deploy/game_state-keypair.json`. Rename it if you want clean
+# bookkeeping but Anchor doesn't require it.
+game_config = "F5Sm5SQ5tCyq1SM9U3QBUR2dEQNfeVdXztmduF17rrt4"
+# Replace these placeholders with the pubkeys you get from:
+#   solana-keygen new -o target/deploy/player_registry-keypair.json
+#   solana-keygen new -o target/deploy/player_state-keypair.json
+player_registry = "8cKqpw8r4GwdKRFZFvDM95RB3C4kDgBLdtvCYNa7dwkw"
+player_state = "CpHKf8pn8VvBMjJAzEePyBAgNJSxofBQLySi3uTMDfA3"
 
-[programs.devnet]
-game_state = "Cv8E8HLY9u5GdJsWYd4AKfgvMRAjUrnxypdkQngi4Umd"
-lobby = "4Uu75QspEnoCzdDp8QWQkMCfbL5aY6xkk14mccziPtdB"
-soloon_game = "ZH7BDgpKKEfY24YhkRcpZ54EpjtLdhHVRvZa5S4YjSd"
+# ── Systems ───────────────────────────────────────────────────
+# `init_game` / `submit_action` / `resolve_turn` / `end_match` keep
+# the keypairs they had as create_match / commit_action / resolve_turn /
+# end_match so on-chain upgrades land cleanly.
+init_game = "FQozXZswq5TLPrbcrPK89tFAnNvQ9EXpWsSsA9WjiSYp"
+submit_action = "CyR4sd7GhKvpcsRTfmbDULSjiGfH2THuCkFkhZ8RFL9A"
+resolve_turn = "9kMyrkkyuhiZYMeGXJBFTgrfMMtfmBkkKk7R4eLV3NKv"
+end_match = "8k8tVsZR2NvB7cAPzcJeyiq7rckBCL6MDQ2kBAGKXK3s"
+# Replace these placeholders with `solana-keygen new` output too.
+spawn_player = "2En9syZVpQYtt8qF5ofVaFcT2niBa8LJcqjVfbXHwpBV"
+start_match = "DzxgjcQkfAW43Xt7gQcp9WBmr2vopb88UZBrX5wFMhqg"
+apply_turn = "FpvpcEJCqRwCq4u4h3HgiX8ZhrseUtM8tSPkB8Mq77nv"
+
+# ── Lobby (Anchor, not ECS) ───────────────────────────────────
+lobby = "ME4mKRb4XBeFkzxsyiHEjd82Lx5cX4BUudXpno2C6DL"
 
 [registry]
 url = "https://api.apr.dev"

@@ -1,7 +1,7 @@
 [package]
 name = "lobby"
 version = "0.1.0"
-description = "007 game lobby with SOL escrow and prize distribution"
+description = "Soloon match lobby: escrow, queue, prize distribution. Cross-checks winners via GameConfig component."
 edition = "2021"
 
 [lib]
@@ -14,7 +14,10 @@ no-idl = []
 no-log-ix-name = []
 cpi = ["no-entrypoint"]
 default = []
-idl-build = ["anchor-lang/idl-build"]
+idl-build = ["anchor-lang/idl-build", "game-config/idl-build"]
 
 [dependencies]
-anchor-lang = { version = "0.32.1", features = ["derive"] }
+anchor-lang = { version = "=0.32.1", features = ["derive", "init-if-needed"] }
+# CPI-free import: we only deserialize the GameConfig account in
+# distribute_prize to read its `winners` Vec + `bolt_metadata.entity`.
+game-config = { path = "../../programs-ecs/components/game-config", features = ["cpi"] }

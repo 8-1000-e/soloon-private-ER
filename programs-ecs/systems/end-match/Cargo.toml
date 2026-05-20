@@ -1,7 +1,7 @@
 [package]
 name = "end-match"
 version = "0.2.4"
-description = "Created with Bolt"
+description = "Tombstone assertion: GameConfig.status must be Finished. Called by the lobby program before distributing the pot."
 edition = "2021"
 
 [lib]
@@ -19,9 +19,6 @@ anchor-debug = ["bolt-lang/anchor-debug"]
 custom-heap = []
 custom-panic = []
 
-
 [dependencies]
 bolt-lang.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-
-game-state = { path = "../../components/game-state", features = ["cpi"] }
+game-config = { path = "../../components/game-config", features = ["cpi"] }

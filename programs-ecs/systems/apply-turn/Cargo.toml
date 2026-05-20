@@ -1,12 +1,12 @@
 [package]
-name = "create-match"
+name = "apply-turn"
 version = "0.2.4"
-description = "Created with Bolt"
+description = "Apply pass: copies `GameConfig.pending_effects[seat]` onto one PlayerState. Called once per player after resolve-turn."
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "create_match"
+name = "apply_turn"
 
 [features]
 no-entrypoint = []
@@ -19,10 +19,7 @@ anchor-debug = ["bolt-lang/anchor-debug"]
 custom-heap = []
 custom-panic = []
 
-
 [dependencies]
 bolt-lang.workspace = true
-serde = { version = "1.0", features = ["derive"] }
-
-game-state = { path = "../../components/game-state", features = ["cpi"] }
-solana-sha256-hasher = "2.3"
+game-config = { path = "../../components/game-config", features = ["cpi"] }
+player-state = { path = "../../components/player-state", features = ["cpi"] }
