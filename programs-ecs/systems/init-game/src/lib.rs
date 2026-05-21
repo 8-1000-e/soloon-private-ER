@@ -2,7 +2,7 @@ use bolt_lang::*;
 use game_config::{GameConfig, PendingEffect, MAX_PLAYERS};
 use player_registry::PlayerRegistry;
 
-declare_id!("FQozXZswq5TLPrbcrPK89tFAnNvQ9EXpWsSsA9WjiSYp");
+declare_id!("DP8R8Fkj2py7VMkRTH1JgWxq7nwydncKrwG8RJacKSJh");
 
 #[error_code]
 pub enum GameError {

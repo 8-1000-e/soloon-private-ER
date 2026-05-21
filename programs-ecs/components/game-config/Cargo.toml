@@ -21,3 +21,7 @@ custom-panic = []
 
 [dependencies]
 bolt-lang.workspace = true
+# Direct dep so we can call `access_control::*` for the custom
+# `init_permission` ix (Bolt re-exports only `cpi::*` from this SDK).
+# Pinned to 0.8.5 to match the transitive version bolt-lang resolves.
+ephemeral-rollups-sdk = { version = "=0.8.5", features = ["anchor", "access-control"] }

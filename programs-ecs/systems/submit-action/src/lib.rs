@@ -2,7 +2,7 @@ use bolt_lang::*;
 use game_config::GameConfig;
 use player_state::PlayerState;
 
-declare_id!("CyR4sd7GhKvpcsRTfmbDULSjiGfH2THuCkFkhZ8RFL9A");
+declare_id!("FrwwoEpAHoqqiNrH4kQsD4tZpsXNwKkuE3btDVcrqXdo");
 
 // ── Phase + status enums (mirror game-config doc-comments) ────────────
 const STATUS_RUNNING: u8 = 1;
